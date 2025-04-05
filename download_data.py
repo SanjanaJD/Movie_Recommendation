@@ -1,25 +1,67 @@
+# Install dependencies as needed:
+# pip install kagglehub[pandas-datasets]
+import kagglehub
+from kagglehub import KaggleDatasetAdapter
 import os
-import kaggle
+import pandas as pd
 
-# Function to download dataset from Kaggle
-def download_kaggle_dataset(dataset_name, output_dir_name):
-    try:
-        output_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), output_dir_name)
-        os.makedirs(output_dir, exist_ok=True)
+# Create Data folder if it doesn't exist
+data_folder = "Data"
+os.makedirs(data_folder, exist_ok=True)
 
-        # Download dataset
-        kaggle.api.dataset_download_files(dataset_name, path=output_dir, unzip=True)
-        print(f"Dataset downloaded and extracted to: {output_dir}")
+try:
+    # Set the path to the file you'd like to load
+    file_path_1 = "movies.csv"  
+    file_path_2 = "ratings.csv"
+    
+    # Load the latest version
+    df = kagglehub.load_dataset(
+        KaggleDatasetAdapter.PANDAS,
+        "shubhammehta21/movie-lens-small-latest-dataset",
+        file_path_1,
+    )
+    
+    # Save the dataframe to CSV in the Data folder
+    output_path = os.path.join(data_folder, file_path_1)
+    df.to_csv(output_path, index=False)
+    
+    print("First 5 records:")
+    print(df.head())
+    print(f"\nData successfully saved to: {output_path}")
 
-    except Exception as e:
-        print(f"Error downloading dataset: {e}")
-        raise
+    df = kagglehub.load_dataset(
+        KaggleDatasetAdapter.PANDAS,
+        "shubhammehta21/movie-lens-small-latest-dataset",
+        file_path_2,
+    )
+    
+    # Save the dataframe to CSV in the Data folder
+    output_path = os.path.join(data_folder, file_path_2)
+    df.to_csv(output_path, index=False)
+    
+    print("First 5 records:")
+    print(df.head())
+    print(f"\nData successfully saved to: {output_path}")
 
-# Main function
-def main():
-    dataset_name = "ahsanaseer/top-rated-tmdb-movies-10k"  # Dataset name from Kaggle
-    output_path = "Data"
-    download_kaggle_dataset(dataset_name, output_path)
+    file_path = "Top_100_Trending_Movies_2025.csv"  
+    
+    # Load the latest version
+    df = kagglehub.load_dataset(
+        KaggleDatasetAdapter.PANDAS,
+        "taimoor888/top-100-trending-movies-of-2025",
+        file_path,
+    )
+    
+    # Save the dataframe to CSV in the Data folder
+    output_path = os.path.join(data_folder, file_path)
+    df.to_csv(output_path, index=False)
+    
+    print("First 5 records:")
+    print(df.head())
+    print(f"\nData successfully saved to: {output_path}")
 
-if __name__ == "__main__":
-    main()
+except Exception as e:
+    print(f"An error occurred: {str(e)}")
+    print("Please check your internet connection, Kaggle credentials, or dataset availability.")
+
+
