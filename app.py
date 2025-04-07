@@ -10,7 +10,7 @@ import plotly.express as px
 import plotly.graph_objects as go
 
 # --- Configuration & Constants ---
-DATA_FOLDER = 'data'
+DATA_FOLDER = 'Data'
 MOVIES_RATINGS_FILE = os.path.join(DATA_FOLDER, 'movies_ratings.csv') 
 NEW_MOVIES_FILE = os.path.join(DATA_FOLDER, 'updated_new_movies.csv') 
 N_RECOMMENDATIONS = 10  # Number of recommendations (SVD or similarity-based)
@@ -354,7 +354,7 @@ def plot_latent_space(pca_df, user_rated_ids, recommended_ids, movie_titles_map,
 
 # --- Streamlit App Layout ---
 st.set_page_config(layout="wide")
-st.title("🎬 Visual Movie Recommendation System")
+st.title("🎬 Visualising Movie Recommendation System")
 
 # Load Data and Train Model
 movies_df, ratings_df, movie_ratings_df, movie_titles, movie_genres, new_movie_ids = load_data()
