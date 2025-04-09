@@ -1,7 +1,8 @@
-streamlit
+pandas==2.2.3
+plotly
 scikit-learn
 scikit-surprise
-numpy
-plotly
+streamlit
+surprise
 kagglehub
-pandas==2.2.3
+numpy
