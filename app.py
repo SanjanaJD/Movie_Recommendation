@@ -8,30 +8,96 @@ import numpy as np
 from sklearn.decomposition import PCA
 import plotly.express as px
 import plotly.graph_objects as go
+import kagglehub
+from kagglehub import KaggleDatasetAdapter
 
 # --- Configuration & Constants ---
 DATA_FOLDER = 'Data'
 MOVIES_RATINGS_FILE = os.path.join(DATA_FOLDER, 'movies_ratings.csv') 
 NEW_MOVIES_FILE = os.path.join(DATA_FOLDER, 'updated_new_movies.csv') 
-N_RECOMMENDATIONS = 10  # Number of recommendations (SVD or similarity-based)
-N_NEW_MOVIES = 2       # Minimum number of new movies to recommend
+N_RECOMMENDATIONS = 10
+N_NEW_MOVIES = 2
 N_DISPLAY_USER_RATINGS = 5
 N_SIMILAR_MOVIES_DISPLAY = 5
 N_PCA_COMPONENTS = 2
 
-# --- Data Loading (Cached) ---
+# --- Data Downloading and Preprocessing ---
+@st.cache_data
+def download_and_preprocess_data():
+    """Download datasets from Kaggle and preprocess them."""
+    os.makedirs(DATA_FOLDER, exist_ok=True)
+
+    # Download MovieLens datasets
+    st.write("Downloading MovieLens datasets...")
+    movies_df = kagglehub.load_dataset(
+        KaggleDatasetAdapter.PANDAS,
+        "shubhammehta21/movie-lens-small-latest-dataset",
+        "movies.csv",
+    )
+    ratings_df = kagglehub.load_dataset(
+        KaggleDatasetAdapter.PANDAS,
+        "shubhammehta21/movie-lens-small-latest-dataset",
+        "ratings.csv",
+    )
+    movies_df.to_csv(os.path.join(DATA_FOLDER, 'movies.csv'), index=False)
+    ratings_df.to_csv(os.path.join(DATA_FOLDER, 'ratings.csv'), index=False)
+
+    # Merge movies and ratings
+    movie_ratings_df = pd.merge(ratings_df, movies_df, on='movieId', how='left')
+    movie_ratings_df.drop(columns=['timestamp'], inplace=True)
+    movie_ratings_df.to_csv(MOVIES_RATINGS_FILE, index=False)
+    st.write("MovieLens data merged and saved.")
+
+    # Download and preprocess new movies dataset
+    st.write("Downloading Top 100 Trending Movies 2025 dataset...")
+    new_movies_df = kagglehub.load_dataset(
+        KaggleDatasetAdapter.PANDAS,
+        "taimoor888/top-100-trending-movies-of-2025",
+        "Top_100_Trending_Movies_2025.csv",
+    )
+
+    # Preprocessing new movies
+    def parse_box_office(value):
+        if pd.isna(value):
+            return 0
+        value = value.replace('$', '').strip()
+        if 'billion' in value.lower():
+            return float(value.replace(' billion', '')) * 1000
+        elif 'million' in value.lower():
+            return float(value.replace(' million', ''))
+        return 0
+
+    def assign_rating(box_office):
+        if box_office >= 1000:
+            return 4.5
+        elif box_office >= 500:
+            return 3.5
+        else:
+            return 2.5
+
+    increament_value = 193609
+    new_movies_df = new_movies_df[new_movies_df['Rank'].notna()]
+    new_movies_df['Rank'] = (new_movies_df['Rank'].astype(int) + increament_value)
+    new_movies_df['Genre'] = new_movies_df['Genre'].str.replace(',', '|')
+    new_movies_df.rename(columns={'Rank': 'movieId', 'Genre': 'genres', 'Title': 'title', 'IMDB Rating': 'rating'}, inplace=True)
+    new_movies_df['box_office_millions'] = new_movies_df['Box Office Prediction'].apply(parse_box_office)
+    new_movies_df['rating'] = new_movies_df['rating'].fillna(new_movies_df['box_office_millions'].apply(assign_rating))
+    new_movies_df = new_movies_df[['movieId', 'title', 'genres', 'rating']]
+    new_movies_df.to_csv(NEW_MOVIES_FILE, index=False)
+    st.write("New movies data preprocessed and saved.")
+
+    return movie_ratings_df, new_movies_df
+
 @st.cache_data
 def load_data():
     """Loads movies_ratings and updated_new_movies data, preprocesses for compatibility."""
     try:
-        movies_ratings = pd.read_csv(MOVIES_RATINGS_FILE)
-        st.write("Movies Ratings data loaded successfully.")
-        ratings_df = movies_ratings[['userId', 'movieId', 'rating']].copy()
-        movies_df = movies_ratings[['movieId', 'title', 'genres']].drop_duplicates().copy()
+        movie_ratings_df, new_movies_df = download_and_preprocess_data()
 
-        new_movies = pd.read_csv(NEW_MOVIES_FILE)
-        st.write("New Movies data loaded successfully.")
-        new_movies_df = new_movies[['movieId', 'title', 'genres']]
+        ratings_df = movie_ratings_df[['userId', 'movieId', 'rating']].copy()
+        movies_df = movie_ratings_df[['movieId', 'title', 'genres']].drop_duplicates().copy()
+
+        new_movies_df = new_movies_df[['movieId', 'title', 'genres']]
         movies_df = pd.concat([movies_df, new_movies_df], ignore_index=True).drop_duplicates(subset='movieId')
 
         movies_df['year'] = movies_df['title'].str.extract(r'\((\d{4})\)', expand=False)
@@ -39,21 +105,17 @@ def load_data():
         movie_titles = movies_df.set_index('movieId')['title'].to_dict()
         movie_genres = movies_df.set_index('movieId')['genres_list'].to_dict()
         movie_ratings_df = pd.merge(ratings_df, movies_df, on='movieId', how='left')
-        new_movie_ids = new_movies['movieId'].tolist()
+        new_movie_ids = new_movies_df['movieId'].tolist()
 
         st.success("Data loaded and preprocessed successfully!")
         return movies_df, ratings_df, movie_ratings_df, movie_titles, movie_genres, new_movie_ids
-    except FileNotFoundError as e:
-        st.error(f"Error: Data file not found - {e}")
-        return None, None, None, None, None, None
     except Exception as e:
         st.error(f"An error occurred during data loading: {e}")
         return None, None, None, None, None, None
 
-# --- Model Training & Factor/PCA Access (Cached) ---
 @st.cache_resource
 def train_svd_model_and_get_factors(_ratings_df, _movies_df):
-    """Trains SVD model and computes PCA for visualization."""
+    # [Your existing train_svd_model_and_get_factors function remains unchanged]
     if _ratings_df is None or _movies_df is None:
         st.warning("Cannot train model, data not loaded.")
         return None, None, None, None, None
@@ -655,7 +717,7 @@ st.sidebar.info("""
     with **genre-based estimation** for new movies, **similarity analysis**, and **latent space visualization**.
     - **Existing User**: SVD + genre estimation.
     - **New User**: Similarity-based with SVD factors and genre overlap.
-    **Data:** MovieLens (movies_ratings.csv) + Future Movies (updated_new_movies.csv)
+    **Data:** MovieLens (downloaded dynamically) + Future Movies (processed from Top 100 Trending Movies 2025)
     **Model:** Surprise SVD + Scikit-learn PCA
     **Visualization:** Streamlit + Plotly
 """)
